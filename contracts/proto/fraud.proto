@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package payflow.fraud;
+
+option go_package = "github.com/payflow/contracts/proto/fraud";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+// FraudDetectionService - gRPC interface for real-time fraud checks
+// Performance-critical path: called synchronously during payment processing
+service FraudDetectionService {
+  // Check a single transaction for fraud indicators
+  rpc CheckTransaction(FraudCheckRequest) returns (FraudCheckResponse);
+  
+  // Batch check multiple transactions
+  rpc BatchCheck(BatchFraudCheckRequest) returns (BatchFraudCheckResponse);
+  
+  // Get fraud report for a specific transaction
+  rpc GetFraudReport(GetFraudReportRequest) returns (FraudReport);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (payflow.common.ServiceHealth);
+}
+
+message FraudCheckRequest {
+  string transaction_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string source_account = 4;
+  string destination_account = 5;
+  string transaction_type = 6;
+  string ip_address = 7;
+  string device_fingerprint = 8;
+  google.protobuf.Timestamp timestamp = 9;
+  payflow.common.AuditContext audit = 10;
+}
+
+message FraudCheckResponse {
+  string transaction_id = 1;
+  double risk_score = 2;         // 0.0 - 1.0
+  RiskLevel risk_level = 3;
+  Decision decision = 4;
+  repeated FraudRule triggered_rules = 5;
+  google.protobuf.Timestamp checked_at = 6;
+}
+
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_LOW = 1;
+  RISK_LEVEL_MEDIUM = 2;
+  RISK_LEVEL_HIGH = 3;
+  RISK_LEVEL_CRITICAL = 4;
+}
+
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  DECISION_ALLOW = 1;
+  DECISION_REVIEW = 2;
+  DECISION_BLOCK = 3;
+}
+
+message FraudRule {
+  string rule_name = 1;
+  double score = 2;
+  string description = 3;
+}
+
+message BatchFraudCheckRequest {
+  repeated FraudCheckRequest transactions = 1;
+}
+
+message BatchFraudCheckResponse {
+  repeated FraudCheckResponse results = 1;
+}
+
+message GetFraudReportRequest {
+  string transaction_id = 1;
+}
+
+message FraudReport {
+  string transaction_id = 1;
+  double risk_score = 2;
+  RiskLevel risk_level = 3;
+  Decision decision = 4;
+  repeated FraudRule triggered_rules = 5;
+  google.protobuf.Timestamp checked_at = 6;
+  map<string, string> metadata = 7;
+}
+
+message HealthCheckRequest {}

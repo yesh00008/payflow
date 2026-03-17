@@ -1,0 +1,40 @@
+# ─── Istio Telemetry — PayFlow Inter-Service Log Collection ──────────────────
+# This is the KEY file for capturing inter-service logs.
+# It tells every Envoy sidecar in the payflow namespace to:
+#   1. Log ALL inbound + outbound requests in JSON format
+#   2. Include the trace/span IDs so logs can be correlated with traces
+#
+# Apply: kubectl apply -f istio/telemetry.yaml
+#
+# Verify access logs are flowing:
+#   kubectl logs -n payflow -l app=payflow-api-gateway -c istio-proxy --tail=20
+#   kubectl logs -n payflow -l app=payflow-transaction-service -c istio-proxy --tail=20
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: payflow-access-logs
+  namespace: payflow
+spec:
+  # Applies to all workloads in the payflow namespace
+  accessLogging:
+  - providers:
+    - name: envoy    # built-in Envoy access log provider (stdout → kubectl logs)
+    disabled: false
+
+---
+# ─── Istio Telemetry — Prometheus metrics collection ─────────────────────────
+# Enables standard Istio metrics (request count, latency, error rate)
+# for every service-to-service call in the mesh.
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: payflow-metrics
+  namespace: payflow
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+    overrides:
+    - match:
+        mode: CLIENT_AND_SERVER
+      disabled: false

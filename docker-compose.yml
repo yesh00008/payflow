@@ -1,0 +1,180 @@
+version: "3.9"
+
+# ─── PayFlow — Docker Compose (local development / log collection) ────────────
+# Services: api-gateway, auth, account, transaction, ledger + infra
+#
+# Usage:
+#   docker compose up --build          # start everything
+#   docker compose logs -f             # stream all service logs
+#   docker compose logs -f api-gateway # stream one service
+
+networks:
+  payflow:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+services:
+  # ─── Infrastructure ────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fintech
+      POSTGRES_PASSWORD: fintech123
+      POSTGRES_DB: payflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks: [payflow]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fintech -d payflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks: [payflow]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: fintech
+      RABBITMQ_DEFAULT_PASS: rabbit123
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI
+    networks: [payflow]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ─── Go Microservices ─────────────────────────────────────────────────────
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: cmd/auth-service/Dockerfile
+    image: payflow/auth-service:latest
+    env_file: .env
+    environment:
+      PORT: "8081"
+      SERVICE_NAME: auth-service
+    ports:
+      - "8081:8081"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  account-service:
+    build:
+      context: .
+      dockerfile: cmd/account-service/Dockerfile
+    image: payflow/account-service:latest
+    env_file: .env
+    environment:
+      PORT: "8083"
+      SERVICE_NAME: account-service
+    ports:
+      - "8083:8083"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  transaction-service:
+    build:
+      context: .
+      dockerfile: cmd/transaction-service/Dockerfile
+    image: payflow/transaction-service:latest
+    env_file: .env
+    environment:
+      PORT: "8084"
+      SERVICE_NAME: transaction-service
+    ports:
+      - "8084:8084"
+    networks: [payflow]
+    depends_on:
+      postgres:  { condition: service_healthy }
+      rabbitmq:  { condition: service_healthy }
+      account-service: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  ledger-service:
+    build:
+      context: .
+      dockerfile: cmd/ledger-service/Dockerfile
+    image: payflow/ledger-service:latest
+    env_file: .env
+    environment:
+      PORT: "8085"
+      SERVICE_NAME: ledger-service
+    ports:
+      - "8085:8085"
+    networks: [payflow]
+    depends_on:
+      postgres:  { condition: service_healthy }
+      rabbitmq:  { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: cmd/api-gateway/Dockerfile
+    image: payflow/api-gateway:latest
+    env_file: .env
+    environment:
+      PORT: "8080"
+      SERVICE_NAME: api-gateway
+    ports:
+      - "8080:8080"
+    networks: [payflow]
+    depends_on:
+      auth-service:        { condition: service_healthy }
+      account-service:     { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
+      ledger-service:      { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3

@@ -1,0 +1,40 @@
+# ─── Kiali — Service Mesh Visualisation for PayFlow ──────────────────────────
+# Kiali shows a live graph of every service-to-service call in the mesh.
+# It reads from Prometheus + Istio telemetry — no code changes needed.
+#
+# Install (one-time):
+#   kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/kiali.yaml
+#   kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/prometheus.yaml
+#   kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/grafana.yaml
+#
+# Then open the dashboard:
+#   istioctl dashboard kiali
+#
+# The file below creates a Kiali CR that scopes it to the payflow namespace
+# and sets the Prometheus URL it should query.
+---
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: istio-system
+spec:
+  auth:
+    strategy: anonymous    # no login required in local Minikube
+
+  deployment:
+    accessible_namespaces:
+    - payflow              # only show PayFlow services in the graph
+
+  external_services:
+    prometheus:
+      url: "http://prometheus.istio-system.svc.cluster.local:9090"
+    grafana:
+      enabled: true
+      url: "http://grafana.istio-system.svc.cluster.local:3000"
+    tracing:
+      enabled: true
+      url: "http://tracing.istio-system.svc.cluster.local:16686"
+
+  kiali_feature_flags:
+    istio_injection_action: true     # let Kiali toggle sidecar injection from UI

@@ -1,0 +1,86 @@
+# ─── Prometheus ServiceMonitor — PayFlow ─────────────────────────────────────
+# Tells the Prometheus Operator (or Istio's built-in Prometheus) to scrape
+# metrics from all PayFlow service pods.
+#
+# Prerequisites:
+#   kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/prometheus.yaml
+#
+# Apply: kubectl apply -f observability/prometheus.yaml
+#
+# Access Prometheus UI:
+#   istioctl dashboard prometheus
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payflow-services
+  namespace: payflow
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+    - payflow
+  selector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - payflow-api-gateway
+      - payflow-auth-service
+      - payflow-account-service
+      - payflow-transaction-service
+      - payflow-ledger-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+
+---
+# ─── Prometheus ConfigMap (standalone — no Operator required) ────────────────
+# Use this if you're running the Istio add-on Prometheus (no Operator).
+# Adds a static scrape job for each PayFlow service.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payflow-prometheus-config
+  namespace: payflow
+data:
+  payflow-scrape.yaml: |
+    scrape_configs:
+      - job_name: 'payflow-api-gateway'
+        static_configs:
+          - targets: ['payflow-api-gateway.payflow.svc.cluster.local:8080']
+        metrics_path: /metrics
+
+      - job_name: 'payflow-auth-service'
+        static_configs:
+          - targets: ['payflow-auth-service.payflow.svc.cluster.local:8081']
+        metrics_path: /metrics
+
+      - job_name: 'payflow-account-service'
+        static_configs:
+          - targets: ['payflow-account-service.payflow.svc.cluster.local:8083']
+        metrics_path: /metrics
+
+      - job_name: 'payflow-transaction-service'
+        static_configs:
+          - targets: ['payflow-transaction-service.payflow.svc.cluster.local:8084']
+        metrics_path: /metrics
+
+      - job_name: 'payflow-ledger-service'
+        static_configs:
+          - targets: ['payflow-ledger-service.payflow.svc.cluster.local:8085']
+        metrics_path: /metrics
+
+      # Istio sidecar metrics (inter-service call statistics)
+      - job_name: 'istio-mesh'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names: [payflow]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            action: keep
+            regex: istio-proxy

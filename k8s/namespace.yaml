@@ -1,0 +1,11 @@
+# ─── PayFlow Namespace ────────────────────────────────────────────────────────
+# The label istio-injection=enabled automatically injects an Envoy sidecar
+# into every pod in this namespace — that's how inter-service logs are captured.
+#
+# Apply: kubectl apply -f k8s/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payflow
+  labels:
+    istio-injection: enabled   # ← enables Envoy sidecar auto-injection

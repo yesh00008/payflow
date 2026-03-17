@@ -1,0 +1,25 @@
+# ─── Istio Gateway — PayFlow ──────────────────────────────────────────────────
+# Exposes the api-gateway to the outside world via the Istio ingress gateway.
+# All external HTTP traffic enters the mesh here.
+#
+# Apply: kubectl apply -f istio/gateway.yaml
+#
+# Access via Minikube:
+#   minikube tunnel          (in a separate terminal)
+#   export GATEWAY_IP=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+#   curl http://$GATEWAY_IP/health
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: payflow-gateway
+  namespace: payflow
+spec:
+  selector:
+    istio: ingressgateway   # uses the default Istio ingress gateway pod
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"   # accept any hostname; restrict to a domain name in production

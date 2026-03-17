@@ -1,0 +1,49 @@
+# ─── Istio VirtualService — PayFlow ──────────────────────────────────────────
+# Routes all traffic that enters through payflow-gateway to the api-gateway.
+# The api-gateway then proxies requests to downstream services internally.
+#
+# Apply: kubectl apply -f istio/virtual-service.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: payflow-vs
+  namespace: payflow
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - payflow-gateway
+  http:
+  # ── Health check ──────────────────────────────────────────────────────────
+  - match:
+    - uri: { prefix: /health }
+    route:
+    - destination:
+        host: payflow-api-gateway
+        port: { number: 8080 }
+
+  # ── Auth endpoints ────────────────────────────────────────────────────────
+  - match:
+    - uri: { prefix: /api/v1/auth }
+    route:
+    - destination:
+        host: payflow-api-gateway
+        port: { number: 8080 }
+      timeout: 10s
+
+  # ── All other API calls ───────────────────────────────────────────────────
+  - match:
+    - uri: { prefix: /api }
+    route:
+    - destination:
+        host: payflow-api-gateway
+        port: { number: 8080 }
+      timeout: 30s
+
+  # ── Metrics scrape endpoint ───────────────────────────────────────────────
+  - match:
+    - uri: { prefix: /metrics }
+    route:
+    - destination:
+        host: payflow-api-gateway
+        port: { number: 8080 }

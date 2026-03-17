@@ -1,0 +1,89 @@
+# ─── Istio DestinationRules — PayFlow ────────────────────────────────────────
+# Configures load balancing, connection pooling, and circuit breaking
+# for each PayFlow service inside the mesh.
+#
+# Apply: kubectl apply -f istio/destination-rule.yaml
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: payflow-api-gateway-dr
+  namespace: payflow
+spec:
+  host: payflow-api-gateway
+  trafficPolicy:
+    loadBalancer: { simple: ROUND_ROBIN }
+    connectionPool:
+      http: { http1MaxPendingRequests: 100, http2MaxRequests: 500 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: payflow-auth-service-dr
+  namespace: payflow
+spec:
+  host: payflow-auth-service
+  trafficPolicy:
+    loadBalancer: { simple: ROUND_ROBIN }
+    connectionPool:
+      http: { http1MaxPendingRequests: 50, http2MaxRequests: 200 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: payflow-account-service-dr
+  namespace: payflow
+spec:
+  host: payflow-account-service
+  trafficPolicy:
+    loadBalancer: { simple: ROUND_ROBIN }
+    connectionPool:
+      http: { http1MaxPendingRequests: 50, http2MaxRequests: 200 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: payflow-transaction-service-dr
+  namespace: payflow
+spec:
+  host: payflow-transaction-service
+  trafficPolicy:
+    loadBalancer: { simple: ROUND_ROBIN }
+    connectionPool:
+      http: { http1MaxPendingRequests: 50, http2MaxRequests: 200 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: payflow-ledger-service-dr
+  namespace: payflow
+spec:
+  host: payflow-ledger-service
+  trafficPolicy:
+    loadBalancer: { simple: ROUND_ROBIN }
+    connectionPool:
+      http: { http1MaxPendingRequests: 50, http2MaxRequests: 200 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s

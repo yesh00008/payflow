@@ -1,0 +1,19 @@
+# ─── Istio PeerAuthentication — PayFlow mTLS ─────────────────────────────────
+# Enforces mutual TLS (mTLS) for all service-to-service communication
+# inside the payflow namespace.
+#
+# PERMISSIVE  → accepts both plain-text and mTLS (use while onboarding)
+# STRICT      → rejects any plain-text traffic (use in production)
+#
+# Apply: kubectl apply -f istio/peer-authentication.yaml
+#
+# Verify mTLS is working:
+#   istioctl authn tls-check payflow-api-gateway.payflow.svc.cluster.local -n payflow
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: payflow-mtls
+  namespace: payflow
+spec:
+  mtls:
+    mode: PERMISSIVE   # switch to STRICT once all services are mesh-enrolled

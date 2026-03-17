@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package payflow.transaction;
+
+option go_package = "github.com/payflow/contracts/proto/transaction";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+// TransactionService - gRPC interface for transfer orchestration
+service TransactionService {
+  // Initiate a transfer with saga orchestration
+  rpc InitiateTransfer(InitiateTransferRequest) returns (InitiateTransferResponse);
+  
+  // Get transfer status
+  rpc GetTransferStatus(GetTransferStatusRequest) returns (TransferStatusResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (payflow.common.ServiceHealth);
+}
+
+message InitiateTransferRequest {
+  string source_account_id = 1;
+  string destination_account_id = 2;
+  int64 amount = 3;
+  string currency = 4;
+  string description = 5;
+  string idempotency_key = 6;
+  payflow.common.AuditContext audit = 10;
+}
+
+message InitiateTransferResponse {
+  string transfer_id = 1;
+  string status = 2;       // "pending", "completed", "failed"
+  string saga_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+  string error_message = 5;
+}
+
+message GetTransferStatusRequest {
+  string transfer_id = 1;
+}
+
+message TransferStatusResponse {
+  string transfer_id = 1;
+  string status = 2;
+  string saga_id = 3;
+  repeated SagaStep steps = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp completed_at = 6;
+}
+
+message SagaStep {
+  int32 step_number = 1;
+  string name = 2;
+  string status = 3;
+  google.protobuf.Timestamp executed_at = 4;
+  string error_message = 5;
+}
+
+message HealthCheckRequest {}

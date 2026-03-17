@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: PayFlow API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /v1/transfers:
+    post:
+      summary: Create transfer
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransferRequest"
+      responses:
+        "201":
+          description: Transfer accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferResponse"
+        "400":
+          description: Validation error
+        "409":
+          description: Duplicate idempotency key with different payload
+components:
+  schemas:
+    CreateTransferRequest:
+      type: object
+      required:
+        - sender_account_id
+        - receiver_account_id
+        - amount
+        - currency
+      properties:
+        sender_account_id:
+          type: string
+        receiver_account_id:
+          type: string
+        amount:
+          type: number
+          minimum: 0.01
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        reference:
+          type: string
+    CreateTransferResponse:
+      type: object
+      required:
+        - transfer_id
+        - status
+      properties:
+        transfer_id:
+          type: string
+        status:
+          type: string
+          enum: [accepted, completed]

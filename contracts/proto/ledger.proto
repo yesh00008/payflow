@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package payflow.ledger;
+
+option go_package = "github.com/payflow/contracts/proto/ledger";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+// LedgerService - gRPC interface for performance-critical financial operations
+// Double-entry bookkeeping with serializable isolation
+service LedgerService {
+  // Record a ledger entry with balance update (serializable isolation)
+  rpc RecordEntry(RecordEntryRequest) returns (RecordEntryResponse);
+  
+  // Get account balance - high-frequency read
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  
+  // Get account statement with pagination
+  rpc GetStatement(GetStatementRequest) returns (GetStatementResponse);
+  
+  // Record a double-entry transfer (debit + credit atomically)
+  rpc RecordTransfer(RecordTransferRequest) returns (RecordTransferResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (payflow.common.ServiceHealth);
+}
+
+message RecordEntryRequest {
+  string account_id = 1;
+  int64 amount = 2;          // Amount in minor units
+  string currency = 3;
+  string entry_type = 4;     // "debit" or "credit"
+  string description = 5;
+  string reference = 6;      // External reference (transaction ID)
+  payflow.common.AuditContext audit = 10;
+}
+
+message RecordEntryResponse {
+  string entry_id = 1;
+  string account_id = 2;
+  string amount = 3;         // Decimal string for precision
+  string entry_type = 4;
+  string balance_after = 5;  // Decimal string
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message GetBalanceRequest {
+  string account_id = 1;
+}
+
+message GetBalanceResponse {
+  string account_id = 1;
+  string balance = 2;        // Decimal string for precision
+  string currency = 3;
+  google.protobuf.Timestamp as_of = 4;
+}
+
+message GetStatementRequest {
+  string account_id = 1;
+  google.protobuf.Timestamp from_date = 2;
+  google.protobuf.Timestamp to_date = 3;
+  payflow.common.PaginationRequest pagination = 4;
+}
+
+message GetStatementResponse {
+  string account_id = 1;
+  repeated LedgerEntryMessage entries = 2;
+  payflow.common.PaginationResponse pagination = 3;
+}
+
+message LedgerEntryMessage {
+  string entry_id = 1;
+  string account_id = 2;
+  string amount = 3;
+  string currency = 4;
+  string entry_type = 5;
+  string description = 6;
+  string reference = 7;
+  string balance_after = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message RecordTransferRequest {
+  string source_account_id = 1;
+  string dest_account_id = 2;
+  int64 amount = 3;
+  string currency = 4;
+  string reference = 5;
+  string description = 6;
+  payflow.common.AuditContext audit = 10;
+}
+
+message RecordTransferResponse {
+  string debit_entry_id = 1;
+  string credit_entry_id = 2;
+  string source_balance_after = 3;
+  string dest_balance_after = 4;
+  bool success = 5;
+  string error_message = 6;
+}
+
+message HealthCheckRequest {}

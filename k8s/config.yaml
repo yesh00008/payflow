@@ -1,0 +1,36 @@
+# ─── PayFlow ConfigMap + Secret ───────────────────────────────────────────────
+# Apply: kubectl apply -f k8s/config.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payflow-config
+  namespace: payflow
+data:
+  DATABASE_URL:            "postgres://fintech:fintech123@payflow-postgres:5432/payflow?sslmode=disable"
+  REDIS_URL:               "payflow-redis:6379"
+  RABBITMQ_URL:            "amqp://fintech:rabbit123@payflow-rabbitmq:5672/"
+  TEMPO_ENDPOINT:          "tempo:4317"
+  AUTH_SERVICE_URL:        "http://payflow-auth-service:8081"
+  USER_KYC_SERVICE_URL:    "http://payflow-user-kyc-service:8082"
+  ACCOUNT_SERVICE_URL:     "http://payflow-account-service:8083"
+  TRANSACTION_SERVICE_URL: "http://payflow-transaction-service:8084"
+  LEDGER_SERVICE_URL:      "http://payflow-ledger-service:8085"
+  PAYMENT_CONNECTOR_URL:    "http://payflow-payment-connector:8086"
+  NOTIFICATION_SERVICE_URL: "http://payflow-notification-service:8087"
+  AUDIT_SERVICE_URL:        "http://payflow-audit-compliance:8088"
+  FRAUD_DETECTION_URL:     "http://payflow-fraud-detection:8089"
+  REALTIME_SERVICE_URL:    "http://payflow-realtime-service:8091"
+  GIN_MODE:                "release"
+  LOG_LEVEL:               "info"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payflow-secrets
+  namespace: payflow
+type: Opaque
+stringData:
+  JWT_SECRET:  "supersecretkey123"
+  DB_PASSWORD: "fintech123"

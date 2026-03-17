@@ -1,0 +1,281 @@
+# ─── PayFlow Go Microservice Deployments ─────────────────────────────────────
+# 5 core services: api-gateway, auth, account, transaction, ledger
+# Each pod gets an Envoy sidecar automatically (namespace has istio-injection=enabled)
+#
+# Apply: kubectl apply -f k8s/deployments.yaml
+#
+# Build images first (replace 'payflow' with your Minikube registry):
+#   eval $(minikube docker-env)
+#   docker build -t payflow/api-gateway:latest    -f cmd/api-gateway/Dockerfile    .
+#   docker build -t payflow/auth-service:latest   -f cmd/auth-service/Dockerfile   .
+#   docker build -t payflow/account-service:latest -f cmd/account-service/Dockerfile .
+#   docker build -t payflow/transaction-service:latest -f cmd/transaction-service/Dockerfile .
+#   docker build -t payflow/ledger-service:latest  -f cmd/ledger-service/Dockerfile  .
+
+---
+# ─── API Gateway (port 8080) ──────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payflow-api-gateway
+  namespace: payflow
+  labels:
+    app: payflow-api-gateway
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payflow-api-gateway
+  template:
+    metadata:
+      labels:
+        app: payflow-api-gateway
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "8080"
+    spec:
+      containers:
+      - name: api-gateway
+        image: payflow/api-gateway:latest
+        imagePullPolicy: Never      # use local Minikube image
+        ports:
+        - { containerPort: 8080, name: http }
+        envFrom:
+        - configMapRef: { name: payflow-config }
+        - secretRef:    { name: payflow-secrets }
+        resources:
+          requests: { memory: "128Mi", cpu: "100m" }
+          limits:   { memory: "256Mi", cpu: "500m" }
+        livenessProbe:
+          httpGet: { path: /health, port: 8080 }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: { path: /health, port: 8080 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payflow-api-gateway
+  namespace: payflow
+spec:
+  selector:
+    app: payflow-api-gateway
+  ports:
+  - { port: 8080, targetPort: 8080, name: http }
+
+---
+# ─── Auth Service (port 8081) ────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payflow-auth-service
+  namespace: payflow
+  labels:
+    app: payflow-auth-service
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payflow-auth-service
+  template:
+    metadata:
+      labels:
+        app: payflow-auth-service
+        version: v1
+    spec:
+      containers:
+      - name: auth-service
+        image: payflow/auth-service:latest
+        imagePullPolicy: Never
+        ports:
+        - { containerPort: 8081, name: http }
+        envFrom:
+        - configMapRef: { name: payflow-config }
+        - secretRef:    { name: payflow-secrets }
+        resources:
+          requests: { memory: "64Mi",  cpu: "50m" }
+          limits:   { memory: "128Mi", cpu: "250m" }
+        livenessProbe:
+          httpGet: { path: /health, port: 8081 }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: { path: /health, port: 8081 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payflow-auth-service
+  namespace: payflow
+spec:
+  selector:
+    app: payflow-auth-service
+  ports:
+  - { port: 8081, targetPort: 8081, name: http }
+
+---
+# ─── Account Service (port 8083) ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payflow-account-service
+  namespace: payflow
+  labels:
+    app: payflow-account-service
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payflow-account-service
+  template:
+    metadata:
+      labels:
+        app: payflow-account-service
+        version: v1
+    spec:
+      containers:
+      - name: account-service
+        image: payflow/account-service:latest
+        imagePullPolicy: Never
+        ports:
+        - { containerPort: 8083, name: http }
+        envFrom:
+        - configMapRef: { name: payflow-config }
+        - secretRef:    { name: payflow-secrets }
+        resources:
+          requests: { memory: "64Mi",  cpu: "50m" }
+          limits:   { memory: "128Mi", cpu: "250m" }
+        livenessProbe:
+          httpGet: { path: /health, port: 8083 }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: { path: /health, port: 8083 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payflow-account-service
+  namespace: payflow
+spec:
+  selector:
+    app: payflow-account-service
+  ports:
+  - { port: 8083, targetPort: 8083, name: http }
+
+---
+# ─── Transaction Service (port 8084) ─────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payflow-transaction-service
+  namespace: payflow
+  labels:
+    app: payflow-transaction-service
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payflow-transaction-service
+  template:
+    metadata:
+      labels:
+        app: payflow-transaction-service
+        version: v1
+    spec:
+      containers:
+      - name: transaction-service
+        image: payflow/transaction-service:latest
+        imagePullPolicy: Never
+        ports:
+        - { containerPort: 8084, name: http }
+        envFrom:
+        - configMapRef: { name: payflow-config }
+        - secretRef:    { name: payflow-secrets }
+        resources:
+          requests: { memory: "64Mi",  cpu: "50m" }
+          limits:   { memory: "128Mi", cpu: "250m" }
+        livenessProbe:
+          httpGet: { path: /health, port: 8084 }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: { path: /health, port: 8084 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payflow-transaction-service
+  namespace: payflow
+spec:
+  selector:
+    app: payflow-transaction-service
+  ports:
+  - { port: 8084, targetPort: 8084, name: http }
+
+---
+# ─── Ledger Service (port 8085) ──────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payflow-ledger-service
+  namespace: payflow
+  labels:
+    app: payflow-ledger-service
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payflow-ledger-service
+  template:
+    metadata:
+      labels:
+        app: payflow-ledger-service
+        version: v1
+    spec:
+      containers:
+      - name: ledger-service
+        image: payflow/ledger-service:latest
+        imagePullPolicy: Never
+        ports:
+        - { containerPort: 8085, name: http }
+        envFrom:
+        - configMapRef: { name: payflow-config }
+        - secretRef:    { name: payflow-secrets }
+        resources:
+          requests: { memory: "64Mi",  cpu: "50m" }
+          limits:   { memory: "128Mi", cpu: "250m" }
+        livenessProbe:
+          httpGet: { path: /health, port: 8085 }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet: { path: /health, port: 8085 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payflow-ledger-service
+  namespace: payflow
+spec:
+  selector:
+    app: payflow-ledger-service
+  ports:
+  - { port: 8085, targetPort: 8085, name: http }

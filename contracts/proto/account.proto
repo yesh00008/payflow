@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package payflow.account;
+
+option go_package = "github.com/payflow/contracts/proto/account";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+// AccountService - gRPC interface for performance-critical account operations
+// Used for inter-service calls (20% of traffic - high-performance path)
+service AccountService {
+  // Create a new account
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+  
+  // Get account by ID - high-frequency call from transaction/payment services
+  rpc GetAccount(GetAccountRequest) returns (AccountResponse);
+  
+  // Get accounts by user ID
+  rpc GetAccountsByUser(GetAccountsByUserRequest) returns (GetAccountsByUserResponse);
+  
+  // Update account balance - called by ledger service during transactions
+  rpc UpdateBalance(UpdateBalanceRequest) returns (UpdateBalanceResponse);
+  
+  // Validate account exists and is active - fast check for transaction validation
+  rpc ValidateAccount(ValidateAccountRequest) returns (ValidateAccountResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (payflow.common.ServiceHealth);
+}
+
+message CreateAccountRequest {
+  string user_id = 1;
+  string currency = 2;
+  string account_type = 3;  // checking, savings, business
+  int64 initial_balance = 4;
+  payflow.common.AuditContext audit = 10;
+}
+
+message CreateAccountResponse {
+  string account_id = 1;
+  string account_number = 2;
+  string status = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message GetAccountRequest {
+  string account_id = 1;
+}
+
+message AccountResponse {
+  string account_id = 1;
+  string user_id = 2;
+  string account_number = 3;
+  string currency = 4;
+  string account_type = 5;
+  string status = 6;
+  int64 balance = 7;
+  int64 available_balance = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message GetAccountsByUserRequest {
+  string user_id = 1;
+  payflow.common.PaginationRequest pagination = 2;
+}
+
+message GetAccountsByUserResponse {
+  repeated AccountResponse accounts = 1;
+  payflow.common.PaginationResponse pagination = 2;
+}
+
+message UpdateBalanceRequest {
+  string account_id = 1;
+  int64 amount = 2;          // Positive for credit, negative for debit
+  string reference_id = 3;   // Transaction/transfer ID
+  string operation = 4;      // "debit" or "credit"
+  payflow.common.AuditContext audit = 10;
+}
+
+message UpdateBalanceResponse {
+  string account_id = 1;
+  int64 new_balance = 2;
+  int64 new_available_balance = 3;
+  bool success = 4;
+  string error_message = 5;
+}
+
+message ValidateAccountRequest {
+  string account_id = 1;
+  string required_currency = 2;  // Optional: validate currency matches
+  int64 minimum_balance = 3;     // Optional: validate sufficient funds
+}
+
+message ValidateAccountResponse {
+  bool valid = 1;
+  string status = 2;
+  string error_code = 3;   // ACCOUNT_NOT_FOUND, ACCOUNT_INACTIVE, INSUFFICIENT_FUNDS, CURRENCY_MISMATCH
+  string error_message = 4;
+}
+
+message HealthCheckRequest {}
