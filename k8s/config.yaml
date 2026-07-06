@@ -7,22 +7,39 @@ metadata:
   name: payflow-config
   namespace: payflow
 data:
-  DATABASE_URL:            "postgres://fintech:fintech123@payflow-postgres:5432/payflow?sslmode=disable"
-  REDIS_URL:               "payflow-redis:6379"
-  RABBITMQ_URL:            "amqp://fintech:rabbit123@payflow-rabbitmq:5672/"
-  TEMPO_ENDPOINT:          "tempo:4317"
+  # Infrastructure Hosts
+  DB_HOST:                 "postgres"
+  DB_PORT:                 "5432"
+  DB_USER:                 "fintech"
+  DB_NAME:                 "payflow"
+  REDIS_HOST:              "redis"
+  REDIS_PORT:              "6379"
+  RABBITMQ_HOST:           "rabbitmq"
+  RABBITMQ_PORT:           "5672"
+  RABBITMQ_USER:           "fintech"
+  MONGO_HOST:              "mongodb"
+  MONGO_PORT:              "27017"
+  MONGO_USER:              "fintech"
+  MONGO_DB:                "payflow"
+  # Connection URLs
+  DATABASE_URL:            "postgres://fintech:fintech123@postgres:5432/payflow?sslmode=disable"
+  DB_URL:                  "postgres://fintech:fintech123@postgres:5432/payflow?sslmode=disable"
+  REDIS_URL:               "redis:6379"
+  REDIS_ADDR:              "redis:6379"
+  RABBITMQ_URL:            "amqp://fintech:rabbit123@rabbitmq:5672/"
+  # Service Endpoints
   AUTH_SERVICE_URL:        "http://payflow-auth-service:8081"
   USER_KYC_SERVICE_URL:    "http://payflow-user-kyc-service:8082"
   ACCOUNT_SERVICE_URL:     "http://payflow-account-service:8083"
   TRANSACTION_SERVICE_URL: "http://payflow-transaction-service:8084"
   LEDGER_SERVICE_URL:      "http://payflow-ledger-service:8085"
-  PAYMENT_CONNECTOR_URL:    "http://payflow-payment-connector:8086"
+  PAYMENT_CONNECTOR_URL:   "http://payflow-payment-connector:8086"
   NOTIFICATION_SERVICE_URL: "http://payflow-notification-service:8087"
-  AUDIT_SERVICE_URL:        "http://payflow-audit-compliance:8088"
-  FRAUD_DETECTION_URL:     "http://payflow-fraud-detection:8089"
-  REALTIME_SERVICE_URL:    "http://payflow-realtime-service:8091"
+  AUDIT_SERVICE_URL:       "http://payflow-audit-compliance:8088"
+  # Observability
+  TEMPO_ENDPOINT:          "jaeger:4317"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
   GIN_MODE:                "release"
-  LOG_LEVEL:               "info"
 
 ---
 apiVersion: v1
@@ -32,5 +49,7 @@ metadata:
   namespace: payflow
 type: Opaque
 stringData:
-  JWT_SECRET:  "supersecretkey123"
-  DB_PASSWORD: "fintech123"
+  DB_PASSWORD:       "fintech123"
+  RABBITMQ_PASSWORD: "rabbit123"
+  MONGO_PASSWORD:    "mongo123"
+  JWT_SECRET:        "supersecretkey123"

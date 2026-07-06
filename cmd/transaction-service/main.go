@@ -2,29 +2,28 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+"database/sql"
+"encoding/json"
+"fmt"
+"log"
+"net/http"
+"os"
+"os/signal"
+"syscall"
+"time"
+"github.com/gin-gonic/gin"
+"github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+"github.com/prometheus/client_golang/prometheus/promhttp"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
+"go.opentelemetry.io/otel"
+"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+"go.opentelemetry.io/otel/propagation"
+"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+"google.golang.org/grpc"
+"google.golang.org/grpc/credentials/insecure"
 )
 
 type TransactionService struct {
@@ -33,7 +32,6 @@ type TransactionService struct {
 	accountURL string
 	ledgerURL  string
 }
-
 type TransferRequest struct {
 	SenderAccountID   string `json:"sender_account_id" binding:"required"`
 	ReceiverAccountID string `json:"receiver_account_id" binding:"required"`
@@ -42,14 +40,12 @@ type TransferRequest struct {
 	Reference         string `json:"reference"`
 	Description       string `json:"description"`
 }
-
 type TransferResponse struct {
 	TransferID string `json:"transfer_id"`
 	Status     string `json:"status"`
 	Reference  string `json:"reference"`
 	CreatedAt  string `json:"created_at"`
 }
-
 type IdempotencyRecord struct {
 	Key         string    `db:"key"`
 	PayloadHash string    `db:"payload_hash"`
@@ -57,7 +53,6 @@ type IdempotencyRecord struct {
 	ExpiresAt   time.Time `db:"expires_at"`
 	CreatedAt   time.Time `db:"created_at"`
 }
-
 type TransferSaga struct {
 	SagaID            string     `json:"saga_id"`
 	SenderAccountID   string     `json:"sender_account_id"`
@@ -69,7 +64,6 @@ type TransferSaga struct {
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
-
 type SagaStep struct {
 	StepID      string     `json:"step_id"`
 	Service     string     `json:"service"`
@@ -79,7 +73,6 @@ type SagaStep struct {
 	StartedAt   time.Time  `json:"started_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
-
 func initTracer() (*sdktrace.TracerProvider, error) {
 	ctx := context.Background()
 
@@ -95,7 +88,11 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, "tempo:4317",
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint == "" {
+		otelEndpoint = "jaeger:4317"
+	}
+	conn, err := grpc.DialContext(ctx, otelEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
@@ -125,8 +122,7 @@ func (s *TransactionService) CreateTransfer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Idempotency-Key header is required"})
 		return
 	}
-
-	var req TransferRequest
+var req TransferRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -329,8 +325,7 @@ func (s *TransactionService) checkIdempotency(ctx context.Context, key string) (
 		}
 		return nil, err
 	}
-
-	var response TransferResponse
+var response TransferResponse
 	if err := json.Unmarshal(result, &response); err != nil {
 		return nil, err
 	}
@@ -401,24 +396,24 @@ func (s *TransactionService) HealthCheck(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "transaction-service"})
 }
-
 type TransferResult struct {
 	TransferID string `json:"transfer_id"`
 	Status     string `json:"status"`
 	Error      string `json:"error,omitempty"`
 }
-
 func main() {
-	// Initialize tracer
+	// Initialize tracer (non-fatal: continue without tracing if OTEL is unavailable)
 	tp, err := initTracer()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Warning: tracer init failed (continuing without tracing): %v", err)
+	} else {
+		defer
+func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				log.Printf("Error shutting down tracer provider: %v", err)
+			}
+		}()
 	}
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
-		}
-	}()
 
 	// Database connection
 	dbURL := os.Getenv("DATABASE_URL")
@@ -487,7 +482,8 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
+	go
+func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Server failed to start:", err)
 		}

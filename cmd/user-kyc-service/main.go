@@ -2,27 +2,26 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
+"database/sql"
+"log"
+"net/http"
+"os"
+"os/signal"
+"syscall"
+"time"
+"github.com/gin-gonic/gin"
+"github.com/go-redis/redis/v8"
+"github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
+"github.com/prometheus/client_golang/prometheus/promhttp"
+"go.opentelemetry.io/otel"
+"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+"go.opentelemetry.io/otel/propagation"
+"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+"google.golang.org/grpc"
+"google.golang.org/grpc/credentials/insecure"
 )
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -39,7 +38,6 @@ type UserProfile struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
-
 type KYCDocument struct {
 	ID         string     `json:"document_id"`
 	UserID     string     `json:"user_id"`
@@ -49,7 +47,6 @@ type KYCDocument struct {
 	UploadedAt time.Time  `json:"uploaded_at"`
 	ReviewedAt *time.Time `json:"reviewed_at,omitempty"`
 }
-
 type UserKYCService struct {
 	db    *sql.DB
 	redis *redis.Client
@@ -80,6 +77,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
+
 
 func (s *UserKYCService) CreateProfile(c *gin.Context) {
 	var req struct {
@@ -127,8 +125,7 @@ func (s *UserKYCService) GetProfile(c *gin.Context) {
 	if cached, err := s.redis.Get(c.Request.Context(), "profile:"+userID).Result(); err == nil {
 		log.Printf("Cache hit for profile %s: %s", userID, cached)
 	}
-
-	var p UserProfile
+var p UserProfile
 	err := s.db.QueryRowContext(c.Request.Context(),
 		`SELECT id, email, full_name, phone_number, date_of_birth, address, kyc_status, risk_score, created_at, updated_at
 		 FROM user_profiles WHERE id = $1`, userID).
@@ -218,7 +215,6 @@ func (s *UserKYCService) HealthCheck(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "user-kyc-service"})
 }
-
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -244,7 +240,7 @@ func main() {
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
-		Password: getEnv("REDIS_PASSWORD", "redis123"),
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       2,
 	})
 
@@ -264,7 +260,8 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
+	go
+func() {
 		log.Printf("User/KYC service started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

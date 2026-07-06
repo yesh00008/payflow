@@ -126,6 +126,7 @@ spec:
             command: ["rabbitmq-diagnostics", "ping"]
           initialDelaySeconds: 20
           periodSeconds: 10
+          timeoutSeconds: 10
 ---
 apiVersion: v1
 kind: Service
@@ -138,3 +139,44 @@ spec:
   ports:
   - { port: 5672,  targetPort: 5672,  name: amqp }
   - { port: 15672, targetPort: 15672, name: management }
+
+---
+# Jaeger All-in-One (tracing)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payflow-jaeger
+  namespace: payflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payflow-jaeger
+  template:
+    metadata:
+      labels:
+        app: payflow-jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:latest
+        ports:
+        - { containerPort: 4317,  name: otlp-grpc }
+        - { containerPort: 4318,  name: otlp-http }
+        - { containerPort: 16686, name: ui }
+        resources:
+          requests: { memory: "128Mi", cpu: "100m" }
+          limits:   { memory: "256Mi", cpu: "250m" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payflow-jaeger
+  namespace: payflow
+spec:
+  selector:
+    app: payflow-jaeger
+  ports:
+  - { port: 4317,  targetPort: 4317,  name: otlp-grpc }
+  - { port: 4318,  targetPort: 4318,  name: otlp-http }
+  - { port: 16686, targetPort: 16686, name: ui }

@@ -2,27 +2,26 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+"database/sql"
+"log"
+"net/http"
+"os"
+"os/signal"
+"syscall"
+"time"
+"github.com/gin-gonic/gin"
+"github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/shopspring/decimal"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
+"github.com/prometheus/client_golang/prometheus/promhttp"
+"github.com/shopspring/decimal"
+"go.opentelemetry.io/otel"
+"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+"go.opentelemetry.io/otel/propagation"
+"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+"google.golang.org/grpc"
+"google.golang.org/grpc/credentials/insecure"
 )
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -38,7 +37,6 @@ type LedgerEntry struct {
 	BalanceAfter decimal.Decimal `json:"balance_after"`
 	CreatedAt    time.Time       `json:"created_at"`
 }
-
 type LedgerService struct {
 	db *sql.DB
 }
@@ -52,7 +50,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 	))
 	dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(dialCtx, getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "tempo:4317"),
+	conn, err := grpc.DialContext(dialCtx, getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "jaeger:4317"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, err
@@ -68,6 +66,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
+
 
 func (s *LedgerService) RecordEntry(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -195,7 +194,6 @@ func (s *LedgerService) HealthCheck(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "ledger-service"})
 }
-
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -235,7 +233,8 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
+	go
+func() {
 		log.Printf("Ledger service started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

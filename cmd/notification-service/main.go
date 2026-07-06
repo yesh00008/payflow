@@ -2,27 +2,26 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+"encoding/json"
+"log"
+"net/http"
+"os"
+"os/signal"
+"syscall"
+"time"
+"github.com/gin-gonic/gin"
+"github.com/go-redis/redis/v8"
+"github.com/google/uuid"
+"github.com/prometheus/client_golang/prometheus/promhttp"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
+"go.opentelemetry.io/otel"
+"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+"go.opentelemetry.io/otel/propagation"
+"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+"google.golang.org/grpc"
+"google.golang.org/grpc/credentials/insecure"
 )
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -38,7 +37,6 @@ type Notification struct {
 	CreatedAt time.Time  `json:"created_at"`
 	SentAt    *time.Time `json:"sent_at,omitempty"`
 }
-
 type NotificationService struct {
 	redis    *redis.Client
 	rabbitMQ *amqp.Connection
@@ -70,6 +68,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
+
 func (s *NotificationService) SendNotification(c *gin.Context) {
 	var req struct {
 		UserID  string `json:"user_id" binding:"required"`
@@ -98,7 +97,8 @@ func (s *NotificationService) SendNotification(c *gin.Context) {
 	s.redis.Set(c.Request.Context(), "notif:"+notif.ID, data, 48*time.Hour)
 
 	// Simulate sending
-	go func() {
+	go
+func() {
 		time.Sleep(500 * time.Millisecond)
 		now := time.Now()
 		notif.Status = "sent"
@@ -118,12 +118,13 @@ func (s *NotificationService) GetNotification(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "notification not found"})
 		return
 	}
-	var notif Notification
+var notif Notification
 	json.Unmarshal(data, &notif)
 	c.JSON(http.StatusOK, notif)
 }
 
 // consumeEvents listens for domain events and triggers notifications.
+
 func (s *NotificationService) consumeEvents() {
 	ch, err := s.rabbitMQ.Channel()
 	if err != nil {
@@ -146,7 +147,8 @@ func (s *NotificationService) consumeEvents() {
 
 	log.Println("[notification] Started consuming events from RabbitMQ")
 
-	go func() {
+	go
+func() {
 		for d := range msgs {
 			var event map[string]interface{}
 			if err := json.Unmarshal(d.Body, &event); err != nil {
@@ -187,7 +189,6 @@ func (s *NotificationService) HealthCheck(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "notification-service"})
 }
-
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -207,7 +208,7 @@ func main() {
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
-		Password: getEnv("REDIS_PASSWORD", "redis123"),
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       3,
 	})
 
@@ -234,7 +235,8 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
+	go
+func() {
 		log.Printf("Notification service started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

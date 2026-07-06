@@ -2,47 +2,44 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
+"database/sql"
+"fmt"
+"log"
+"net/http"
+"os"
+"os/signal"
+"syscall"
+"time"
+"github.com/gin-gonic/gin"
+"github.com/go-redis/redis/v8"
 	_ "github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
+"github.com/prometheus/client_golang/prometheus/promhttp"
+"go.opentelemetry.io/otel"
+"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+"go.opentelemetry.io/otel/propagation"
+"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+"google.golang.org/grpc"
+"google.golang.org/grpc/credentials/insecure"
 )
 
 type AccountService struct {
 	db    *sql.DB
 	redis *redis.Client
 }
-
 type Account struct {
-	ID              string    `json:"account_id"`
-	UserID          string    `json:"user_id"`
-	AccountNumber   string    `json:"account_number"`
-	Currency        string    `json:"currency"`
-	AccountType     string    `json:"account_type"`
-	Status          string    `json:"status"`
-	Balance         int64     `json:"balance"`
-	AvailableBalance int64    `json:"available_balance"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID               string    `json:"account_id"`
+	UserID           string    `json:"user_id"`
+	AccountNumber    string    `json:"account_number"`
+	Currency         string    `json:"currency"`
+	AccountType      string    `json:"account_type"`
+	Status           string    `json:"status"`
+	Balance          int64     `json:"balance"`
+	AvailableBalance int64     `json:"available_balance"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
-
 func initTracer() (*sdktrace.TracerProvider, error) {
 	ctx := context.Background()
 
@@ -58,7 +55,11 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, "tempo:4317",
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint == "" {
+		otelEndpoint = "jaeger:4317"
+	}
+	conn, err := grpc.DialContext(ctx, otelEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
@@ -82,11 +83,11 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 
 func (s *AccountService) CreateAccount(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	var req struct {
-		UserID        string `json:"user_id" binding:"required"`
-		Currency      string `json:"currency" binding:"required,len=3"`
-		AccountType   string `json:"account_type" binding:"required,oneof=checking savings business"`
+		UserID         string `json:"user_id" binding:"required"`
+		Currency       string `json:"currency" binding:"required,len=3"`
+		AccountType    string `json:"account_type" binding:"required,oneof=checking savings business"`
 		InitialBalance int64  `json:"initial_balance"`
 	}
 
@@ -108,16 +109,16 @@ func (s *AccountService) CreateAccount(c *gin.Context) {
 
 	// Create account record
 	account := &Account{
-		ID:              generateUUID(),
-		UserID:          req.UserID,
-		AccountNumber:   accountNumber,
-		Currency:        req.Currency,
-		AccountType:     req.AccountType,
-		Status:          "active",
-		Balance:         req.InitialBalance,
+		ID:               generateUUID(),
+		UserID:           req.UserID,
+		AccountNumber:    accountNumber,
+		Currency:         req.Currency,
+		AccountType:      req.AccountType,
+		Status:           "active",
+		Balance:          req.InitialBalance,
 		AvailableBalance: req.InitialBalance,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
 	}
 
 	query := `
@@ -199,28 +200,27 @@ func (s *AccountService) HealthCheck(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "account-service"})
 }
-
 func generateUUID() string {
 	// In production, use a proper UUID library
 	return fmt.Sprintf("acc_%d", time.Now().UnixNano())
 }
-
 func generateAccountNumber() string {
 	// In production, implement proper account number generation with checksum
 	return fmt.Sprintf("ACC%d", time.Now().UnixNano()%1000000000)
 }
-
 func main() {
-	// Initialize tracer
+	// Initialize tracer (non-fatal: continue without tracing if OTEL is unavailable)
 	tp, err := initTracer()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Warning: tracer init failed (continuing without tracing): %v", err)
+	} else {
+		defer
+func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				log.Printf("Error shutting down tracer provider: %v", err)
+			}
+		}()
 	}
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
-		}
-	}()
 
 	// Database connection
 	dbURL := os.Getenv("DATABASE_URL")
@@ -266,13 +266,13 @@ func main() {
 
 	// Setup routes
 	r := gin.Default()
-	
+
 	// Health check
 	r.GET("/health", service.HealthCheck)
-	
+
 	// Metrics endpoint
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-	
+
 	// Account endpoints
 	r.POST("/v1/accounts", service.CreateAccount)
 	r.GET("/v1/accounts/:account_id", service.GetAccount)
@@ -292,7 +292,8 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
+	go
+func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Server failed to start:", err)
 		}

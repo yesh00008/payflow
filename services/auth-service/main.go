@@ -1,5 +1,6 @@
 package main
 
+
 import (
 	"context"
 	"crypto/sha256"
@@ -290,7 +291,8 @@ func (s *AuthService) generateToken(userID, email string, roles []string, ttl ti
 }
 
 func (s *AuthService) validateToken(tokenStr string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{},
+func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
@@ -359,7 +361,8 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
+	go
+func() {
 		log.Printf("Auth service started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

@@ -1,5 +1,6 @@
 package main
 
+
 import (
 	"context"
 	"database/sql"
@@ -350,7 +351,8 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
+	go
+func() {
 		log.Printf("Payment Connector service started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

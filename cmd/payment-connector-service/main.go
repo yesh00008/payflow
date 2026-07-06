@@ -2,28 +2,27 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+"database/sql"
+"encoding/json"
+"log"
+"net/http"
+"os"
+"os/signal"
+"syscall"
+"time"
+"github.com/gin-gonic/gin"
+"github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+"github.com/prometheus/client_golang/prometheus/promhttp"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
+"go.opentelemetry.io/otel"
+"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+"go.opentelemetry.io/otel/propagation"
+"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+"google.golang.org/grpc"
+"google.golang.org/grpc/credentials/insecure"
 )
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -41,7 +40,6 @@ type Payment struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
-
 type PaymentConnectorService struct {
 	db       *sql.DB
 	rabbitMQ *amqp.Connection
@@ -72,6 +70,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
+
 
 func (s *PaymentConnectorService) InitiatePayment(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -118,7 +117,8 @@ func (s *PaymentConnectorService) InitiatePayment(c *gin.Context) {
 	s.publishPaymentEvent(ctx, "payment.initiated", payment)
 
 	// Simulate provider processing and mark as completed
-	go func() {
+	go
+func() {
 		time.Sleep(2 * time.Second) // simulate external provider latency
 		s.db.Exec(
 			`UPDATE payments SET status = 'completed', updated_at = $1 WHERE id = $2`,
@@ -205,7 +205,6 @@ func (s *PaymentConnectorService) HealthCheck(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "payment-connector-service"})
 }
-
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -250,7 +249,8 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
+	go
+func() {
 		log.Printf("Payment connector service started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

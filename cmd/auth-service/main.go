@@ -2,33 +2,32 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"database/sql"
-	"encoding/hex"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"strings"
-	"syscall"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
+"crypto/sha256"
+"database/sql"
+"encoding/hex"
+"fmt"
+"log"
+"net/http"
+"os"
+"os/signal"
+"strings"
+"syscall"
+"time"
+"github.com/gin-gonic/gin"
+"github.com/go-redis/redis/v8"
+"github.com/golang-jwt/jwt/v5"
+"github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"golang.org/x/crypto/bcrypt"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
+"github.com/prometheus/client_golang/prometheus/promhttp"
+"go.opentelemetry.io/otel"
+"go.opentelemetry.io/otel/attribute"
+"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+"go.opentelemetry.io/otel/propagation"
+"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"github.com/golang-jwt/jwt/v5"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+"golang.org/x/crypto/bcrypt"
+"google.golang.org/grpc"
+"google.golang.org/grpc/credentials/insecure"
 )
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -43,14 +42,12 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
-
 type Claims struct {
 	UserID string   `json:"user_id"`
 	Email  string   `json:"email"`
 	Roles  []string `json:"roles"`
 	jwt.RegisteredClaims
 }
-
 type AuthService struct {
 	db        *sql.DB
 	redis     *redis.Client
@@ -70,7 +67,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 	}
 	dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(dialCtx, getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "tempo:4317"),
+	conn, err := grpc.DialContext(dialCtx, getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "jaeger:4317"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, err
@@ -86,6 +83,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
+
 
 func (s *AuthService) Register(c *gin.Context) {
 	var req struct {
@@ -149,8 +147,7 @@ func (s *AuthService) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	var user User
+var user User
 	var rolesStr sql.NullString
 	err := s.db.QueryRowContext(c.Request.Context(),
 		`SELECT u.id, u.email, u.password_hash, u.full_name, u.status,
@@ -172,8 +169,7 @@ func (s *AuthService) Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
-
-	var roles []string
+var roles []string
 	if rolesStr.Valid && rolesStr.String != "" {
 		roles = strings.Split(rolesStr.String, ",")
 	} else {
@@ -235,7 +231,8 @@ func (s *AuthService) ValidateToken(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"valid": false, "error": "missing token"})
 		return
 	}
-	parts := strings.SplitN(auth, " ", 2)
+	parts := strings.SplitN(auth, "
+", 2)
 	if len(parts) != 2 {
 		c.JSON(http.StatusUnauthorized, gin.H{"valid": false})
 		return
@@ -275,6 +272,7 @@ func (s *AuthService) HealthCheck(c *gin.Context) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+
 func (s *AuthService) generateToken(userID, email string, roles []string, ttl time.Duration) (string, error) {
 	claims := Claims{
 		UserID: userID,
@@ -290,7 +288,8 @@ func (s *AuthService) generateToken(userID, email string, roles []string, ttl ti
 }
 
 func (s *AuthService) validateToken(tokenStr string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{},
+func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
@@ -305,7 +304,6 @@ func (s *AuthService) validateToken(tokenStr string) (*Claims, error) {
 	}
 	return claims, nil
 }
-
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -333,7 +331,7 @@ func main() {
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
-		Password: getEnv("REDIS_PASSWORD", "redis123"),
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
 
@@ -359,7 +357,8 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
+	go
+func() {
 		log.Printf("Auth service started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)

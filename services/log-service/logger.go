@@ -1,5 +1,6 @@
 package main
 
+
 import "log"
 
 func logInfo(format string, args ...interface{}) {

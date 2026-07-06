@@ -15,6 +15,7 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  mongo_data:
 
 services:
   # ─── Infrastructure ────────────────────────────────────────────────────────
@@ -63,6 +64,41 @@ services:
       interval: 15s
       timeout: 10s
       retries: 5
+
+  # ─── Observability ───────────────────────────────────────────────────────
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC (replaces tempo:4317)
+      - "4318:4318"    # OTLP HTTP
+    networks: [payflow]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:16686/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  mongodb:
+    image: mongo:7-jammy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: fintech
+      MONGO_INITDB_ROOT_PASSWORD: mongo123
+      MONGO_INITDB_DATABASE: audit
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    networks: [payflow]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # ─── Go Microservices ─────────────────────────────────────────────────────
 
@@ -175,6 +211,250 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  # ─── Additional Go Microservices ──────────────────────────────────────────
+
+  user-kyc-service:
+    build:
+      context: .
+      dockerfile: cmd/user-kyc-service/Dockerfile
+    image: payflow/user-kyc-service:latest
+    env_file: .env
+    environment:
+      PORT: "8086"
+      SERVICE_NAME: user-kyc-service
+    ports:
+      - "8086:8086"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: cmd/notification-service/Dockerfile
+    image: payflow/notification-service:latest
+    env_file: .env
+    environment:
+      PORT: "8087"
+      SERVICE_NAME: notification-service
+    ports:
+      - "8087:8087"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8087/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  payment-connector-service:
+    build:
+      context: .
+      dockerfile: cmd/payment-connector-service/Dockerfile
+    image: payflow/payment-connector-service:latest
+    env_file: .env
+    environment:
+      PORT: "8088"
+      SERVICE_NAME: payment-connector-service
+    ports:
+      - "8088:8088"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8088/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  audit-compliance-service:
+    build:
+      context: .
+      dockerfile: cmd/audit-compliance-service/Dockerfile
+    image: payflow/audit-compliance-service:latest
+    env_file: .env
+    environment:
+      PORT: "8089"
+      SERVICE_NAME: audit-compliance-service
+    ports:
+      - "8089:8089"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      mongodb:  { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8089/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  discovery-client-service:
+    build:
+      context: .
+      dockerfile: cmd/discovery-client-service/Dockerfile
+    image: payflow/discovery-client-service:latest
+    env_file: .env
+    environment:
+      PORT: "8090"
+      SERVICE_NAME: discovery-client-service
+    ports:
+      - "8090:8090"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  api-gateway-service:
+    build:
+      context: .
+      dockerfile: cmd/api-gateway-service/Dockerfile
+    image: payflow/api-gateway-service:latest
+    env_file: .env
+    environment:
+      PORT: "8091"
+      SERVICE_NAME: api-gateway-service
+    ports:
+      - "8091:8091"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8091/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  user-service:
+    build:
+      context: .
+      dockerfile: cmd/user-service/Dockerfile
+    image: payflow/user-service:latest
+    env_file: .env
+    environment:
+      PORT: "8092"
+      SERVICE_NAME: user-service
+    ports:
+      - "8092:8092"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8092/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  bank-service:
+    build:
+      context: .
+      dockerfile: cmd/bank-service/Dockerfile
+    image: payflow/bank-service:latest
+    env_file: .env
+    environment:
+      PORT: "8093"
+      SERVICE_NAME: bank-service
+    ports:
+      - "8093:8093"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8093/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  credit-card-service:
+    build:
+      context: .
+      dockerfile: cmd/credit-card-service/Dockerfile
+    image: payflow/credit-card-service:latest
+    env_file: .env
+    environment:
+      PORT: "8094"
+      SERVICE_NAME: credit-card-service
+    ports:
+      - "8094:8094"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8094/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  invoice-service:
+    build:
+      context: .
+      dockerfile: cmd/invoice-service/Dockerfile
+    image: payflow/invoice-service:latest
+    env_file: .env
+    environment:
+      PORT: "8095"
+      SERVICE_NAME: invoice-service
+    ports:
+      - "8095:8095"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8095/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  log-service:
+    build:
+      context: .
+      dockerfile: cmd/log-service/Dockerfile
+    image: payflow/log-service:latest
+    env_file: .env
+    environment:
+      PORT: "8096"
+      SERVICE_NAME: log-service
+    ports:
+      - "8096:8096"
+    networks: [payflow]
+    depends_on:
+      postgres: { condition: service_healthy }
+      mongodb:  { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8096/health || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 3
